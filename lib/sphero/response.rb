@@ -21,6 +21,7 @@ class Sphero
     def initialize header, body
       @header = header
       @body   = body
+      puts "making a response: #{header}, #{body}"
     end
 
     def valid?
@@ -41,6 +42,10 @@ class Sphero
 
     def body
       @body.unpack 'C*'
+    end
+
+    def to_s
+      puts "header: #{@header} body: #{@body}"
     end
 
     class GetAutoReconnect < Response
@@ -199,5 +204,6 @@ class Sphero
         body[7]
       end
     end
+    
   end
 end

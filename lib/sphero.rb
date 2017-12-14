@@ -1,3 +1,8 @@
+=begin rdoc
+  
+
+=end
+
 require 'sphero/request'
 require 'sphero/response'
 require 'thread'
@@ -51,14 +56,22 @@ class Sphero
     @packets = Queue.new
     @response_queue = Queue.new
     @responses = []
+    @request_table = Hash.new(nil)
+    @response_table = Hash.new(nil)
+    @curr_heading = FORWARD
+    @curr_speed = 0
+
     Thread.new {
       loop do
         write @packets.pop
+        sleep 0.01
       end
     }
     Thread.new {
       loop do
-        @responses << @response_queue.pop
+        # @responses << @response_queue.pop
+        read_all
+        sleep 0.01
       end
     }
   end
@@ -76,19 +89,19 @@ class Sphero
   end
 
   def ping
-    packet = Request::Ping.new(@seq)
+    packet = Request::Ping.new
     queue_packet packet
     return sync_response packet.seq
   end
 
   def version
-    packet = Request::GetVersioning.new(@seq)
+    packet = Request::GetVersioning.new
     queue_packet packet
     return sync_response packet.seq
   end
 
   def bluetooth_info
-    packet = Request::GetBluetoothInfo.new(@seq)
+    packet = Request::GetBluetoothInfo.new
     queue_packet packet
     return sync_response packet.seq
   end
@@ -96,37 +109,37 @@ class Sphero
   # This retrieves the "user LED color" which is stored in the config block
   # (which may or may not be actively driven to the RGB LED).
   def user_led
-    packet = Request::GetRGB.new(@seq)
+    packet = Request::GetRGB.new
     queue_packet packet
     return sync_response packet.seq
   end
 
   def auto_reconnect= time_s
-    queue_packet Request::SetAutoReconnect.new(@seq, limit1(time_s) )
+    queue_packet Request::SetAutoReconnect.new(limit1(time_s) )
   end
 
   def auto_reconnect
-    queue_packet(Request::GetAutoReconnect.new(@seq)).time
+    queue_packet(Request::GetAutoReconnect.new).time
   end
 
   def disable_auto_reconnect
-    queue_packet Request::SetAutoReconnect.new(@seq, 0, flag(false) )
+    queue_packet Request::SetAutoReconnect.new(0, flag(false) )
   end
 
   def enable_stop_on_disconnect
-    queue_packet Request::SetTempOptionFlags.new(@seq, flag(true))
+    queue_packet Request::SetTempOptionFlags.new(flag(true))
   end
 
   def power_state
-    queue_packet Request::GetPowerState.new(@seq)
+    queue_packet Request::GetPowerState.new
   end
 
   def sphero_sleep wakeup = 0, macro = 0
-    queue_packet Request::Sleep.new(@seq, limit2(wakeup), limit1(macro) )
+    queue_packet Request::Sleep.new(limit2(wakeup), limit1(macro) )
   end
 
   def roll speed, heading, state = true
-    queue_packet Request::Roll.new(@seq, limit1(speed), degrees(heading), flag(state) )
+    queue_packet Request::Roll.new(limit1(speed), degrees(heading), flag(state) )
   end
 
   def stop
@@ -134,11 +147,11 @@ class Sphero
   end
 
   def heading= h
-    queue_packet Request::Heading.new(@seq, degrees(h) )
+    queue_packet Request::Heading.new(degrees(h) )
   end
 
   def stabilization= on
-    queue_packet Request::Stabilization.new(@seq, on)
+    queue_packet Request::Stabilization.new( on)
   end
 
   def color colorname, persistant = false
@@ -147,18 +160,18 @@ class Sphero
   end
 
   def rgb r, g, b, persistant = false
-    queue_packet Request::SetRGB.new(@seq, limit1(r), limit1(g), limit1(b), flag(persistant) )
+    queue_packet Request::SetRGB.new(limit1(r), limit1(g), limit1(b), flag(persistant) )
   end
 
 
   # Brightness 0x00 - 0xFF
   def back_led_output= h
-    queue_packet Request::SetBackLEDOutput.new(@seq, limit1(h) )
+    queue_packet Request::SetBackLEDOutput.new(limit1(h) )
   end
 
   # Rotation Rate 0x00 - 0xFF
   def rotation_rate= h
-    queue_packet Request::SetRotationRate.new(@seq, limit1(h))
+    queue_packet Request::SetRotationRate.new(limit1(h))
   end
 
   # just a nicer alias for Ruby's own sleep
@@ -166,22 +179,111 @@ class Sphero
     Kernel::sleep duration
   end
 
+  ################################################################################
+  # added by estryker
+  def direction(degrees)
+    @curr_heading = degrees.to_i % 360
+  end
+
+  def turnright(degrees)
+    @curr_heading = (@curr_heading + degrees) % 360
+  end
+  
+  def turnleft(degrees)
+    turnright(-degrees)
+  end
+
+  def turnaround
+    turnright(180)
+  end
+
+  def speed(new_speed)
+    n = new_speed.to_i
+    # what is the max speed of a Sphero? 
+    @curr_speed = (n >= 0 && n <= 200) ? n : 10
+  end
+  
+  def forward(seconds = 3,speed=nil)
+    if speed.nil?
+      if @curr_speed.nil? or @curr_speed == 0
+        @curr_speed = 50
+      end
+    else
+      @curr_speed = speed
+    end
+    roll @curr_speed, @curr_heading
+    keep_going seconds
+  end
+
+  def backward(seconds = 3)
+    @curr_heading = (@curr_heading + 180) % 360
+    forward(seconds)
+  end
+
+  def on_collision(meth=1, x_t = 100, y_t = 100, x_spd = 100, y_spd = 100, dead = 100, &blk)
+    # configure_collision_detection meth, x_t, y_t, x_spd, y_spd, dead
+    #    The feature is enabled via the Configure Collision Detection (12h) API command. see Appendix A. The Method field should be set to 1, and the X and Y axis impact thresholds should be set. Typical values are in the 100-140 range.The Deadtime value should be set to a typical value of around 1 second (a value of 100).
+    # configure_collision_detection 1, 100, 100, 100, 100, 100
+    configure_collision_detection meth, x_t, y_t, x_spd, y_spd, dead
+    semaphore = Mutex.new
+    $stderr.puts "setting up an 'on_collision' callback"
+    Thread.new do
+      $stderr.puts "About to loop inside the on_collision thread"
+      # make sure other threads have a chance before responding to a collision
+      sleep 0.25
+      loop do
+        #$stderr.puts "pinging ..."
+        begin
+          # Note - we now don't have to write in order to make sure we receive a response
+          # ping
+          # TODO:  possibly hold on to the on_collision block and call it directly from the read_all loop??
+          # puts "ping: #{r.inspect}\n#{r.class}"# unless r.nil?
+          #$stderr.puts "messages length: #{messages.length}"
+          if messages.length > 0
+            r = messages.pop
+            case r
+            when Sphero::Response::CollisionDetected
+              $stderr.puts "Collision detected!"
+              semaphore.synchronize {
+                blk.call(r)
+              }
+            else
+              $stderr.puts "Not a collision. #{r.class}"
+              messages << r
+              sleep 0.1
+            end
+          else
+            # we sleep, Otherwise, this thread takes over
+            sleep 0.1
+          end
+        rescue Exception => e
+          $stderr.puts "#{e.message}\n" + e.backtrace.join("\n")
+          sleep 0.1
+        end
+      end
+    end
+    $stderr.puts "Done starting the thread in 'on_collision'"
+  end
+  
+  ################################################################################
+  
+
   ## async messages
 
   # configure power notification messages
   def set_power_notification enable=true
-    queue_packet Request::SetPowerNotification.new(@seq, flag(enable) )
+    queue_packet Request::SetPowerNotification.new(flag(enable) )
   end
 
   # configure data streaming notification messages
   def set_data_streaming n, m, mask, pcnt, mask2
-    queue_packet Request::SetDataStreaming.new(@seq, limit2(n), limit2(m),
+    queue_packet Request::SetDataStreaming.new( limit2(n), limit2(m),
                                                limit4(mask), limit1(pcnt), limit4(mask2) )
   end
 
   # configure collision detection messages
   def configure_collision_detection meth, x_t, y_t, x_spd, y_spd, dead
-    queue_packet Request::ConfigureCollisionDetection.new(@seq, limit1(meth),
+    queue_packet Request::ConfigureCollisionDetection.new( limit1(meth),
                                                           limit1(x_t),   limit1(y_t),
                                                           limit1(x_spd), limit1(y_spd),
                                                           limit1(dead) )
@@ -189,10 +291,34 @@ class Sphero
 
   private
 
+  # estryker change
+  # instead of a list of responses, build a hash table of responses
+  # continually loop sending messages and receiving messages.
+  # if no response is found, sleep.
+  # when response is found delete it.
+  # OR
+  # if the seq is somewhat limited, we can make a static array to be even faster
+  def sync_response seq
+    num_tries = 0
+    until @response_table.has_key? seq or num_tries > 100
+      num_tries += 1
+      sleep 0.002
+    end
+    if  @response_table.has_key? seq
+      $stderr.puts "Found packet with seq #{seq} after #{num_tries}"
+    else
+      $stderr.puts "Didn't find response for #{seq}"
+    end
+    # delete will return the value and remove the entry
+    return @response_table.delete(seq)
+  end
+  
+=begin original sync_response
   def sync_response seq
     100.times do
       @responses.each do |response|
         if response.seq == seq
+          puts "processing response: #{response}"
           @responses.delete(response)
           return response
         end
@@ -201,6 +327,7 @@ class Sphero
     end
     return nil
   end
+=end
 
   def limit(value, max)
     return nil if value.nil?
@@ -262,37 +389,70 @@ class Sphero
   end
 
   def queue_packet packet
+    packet.seq = get_and_increment_sequence! 
+    $stderr.puts "Queing packet #{packet.seq} (#{packet.class}) ..."
     @packets << packet
   end
 
   def write packet
-    header, body = nil
-
+    $stderr.puts "Writing packet #{packet.seq} (#{packet.class}) ... "
+    @request_table[packet.seq] = packet
     @sp.write packet.to_str
-    @seq += 1
-    header = read_header(true)
-    body = read_body(header.last, true) if header
-    # pick off asynch packets and store, till we get to the message response
-    while header && Response.async?(header)
-      messages << Response::AsyncResponse.response(header, body)
-
-      header = read_header(true)
-      if header
-        body = read_body(header.last, true)
-      else
-        body = nil
-      end
-    end
-
-    response = packet.response header, body
-
-    if response.success?
-      @response_queue << response
-    else
-      puts "Unable to write to Sphero!"
-    end
   end
 
+  # a Thread safe way to increment the sequence number to be applied to messages added to the queue for writing
+  def get_and_increment_sequence!
+    s = nil
+    Mutex.new.synchronize do
+      s = @seq
+      @seq += 1
+    end
+    return s
+  end
+  
+  def read_all
+    # not sure if we want to keep track of these
+    num_read = 0
+    loop do 
+      header = read_header(true)
+      if header
+        body = read_body(header.last, true) 
+        # pick off asynch packets and store, till we get to the message response
+
+        if(Response.async?(header))
+          $stderr.puts "async response: " 
+          messages << Response::AsyncResponse.response(header, body)
+
+          # TODO: should I put the collision detected code here? 
+        else
+          
+          seq = header[3]
+          $stderr.puts "seq in header: #{seq}"
+          if @request_table.has_key? seq
+            $stderr.puts "request in table: #{@request_table[seq]}"
+            response = @request_table[seq].response header, body
+            $stderr.puts "response received: #{response}"
+            # delete the request so the dictionary doesn't get too big
+            @request_table.delete(seq)
+            if response.success?
+              puts "got something back from sphero with seq: #{response.seq} response : #{response}"
+              @response_table[response.seq] = response
+              num_read += 1
+            else
+              $stderr.puts "Response was not successful for seq #{seq}"
+            end
+          else
+            puts "Couldn't find a correspondig request for seq #{seq}"
+          end
+        end
+      else
+        # no header
+        break
+      end
+    end
+    return num_read
+  end
+  
   def read_header(blocking=false)
     header = nil
     begin

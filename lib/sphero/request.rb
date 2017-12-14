@@ -3,10 +3,14 @@ class Sphero
     SOP1 = 0xFF
     SOP2 = 0xFF
 
-    attr_reader :data, :seq
+    attr_reader :data
+    attr_accessor :seq
 
-    def initialize seq, data = []
-      @seq    = seq
+    def initialize data = []
+      # Note that the sequence number should be set when the packet is written.
+      # This will allow for Packet construction to be independent of writing.
+      # 
+      @seq    = 0
       @data   = data
       @did    = 0x00
     end
@@ -28,7 +32,7 @@ class Sphero
         Response.new header, body
       end
     end
-
+    
     def packet_header
       header.pack 'CCCCCC'
     end
@@ -50,7 +54,7 @@ class Sphero
     end
 
     class Sphero < Request
-      def initialize seq, data = []
+      def initialize data = []
         super
         @did = 0x02
       end
@@ -58,8 +62,8 @@ class Sphero
 
     def self.make_command klass, cid, &block
       Class.new(klass) {
-        define_method(:initialize) do |seq, *args|
-          super(seq, args)
+        define_method(:initialize) do | *args|
+          super(args)
           @cid = cid
         end
       }
@@ -78,8 +82,8 @@ class Sphero
     GetPowerState    = make_command Request, 0x20
 
     class Roll < Sphero
-      def initialize seq, speed, heading, delay
-        super(seq, [speed, heading, delay])
+      def initialize  speed, heading, delay
+        super( [speed, heading, delay])
         @cid = 0x30
       end
 
@@ -90,8 +94,8 @@ class Sphero
     end
 
     class Heading < Sphero
-      def initialize seq, heading
-        super(seq, [heading])
+      def initialize  heading
+        super( [heading])
         @cid = 0x01
       end
 
@@ -102,8 +106,8 @@ class Sphero
     end
 
     class Stabilization < Sphero
-      def initialize seq, on
-        super(seq, [on ? 1 : 0])
+      def initialize  on
+        super( [on ? 1 : 0])
         @cid = 0x02
       end
 
@@ -114,8 +118,8 @@ class Sphero
     end
 
     class Sleep < Request
-      def initialize seq, wakeup, macro
-        super(seq, [wakeup, macro])
+      def initialize  wakeup, macro
+        super( [wakeup, macro])
         @cid    = 0x22
       end
 
@@ -127,15 +131,15 @@ class Sphero
     end
 
     class SetPowerNotification < Request
-      def initialize seq, enable
-        super(seq, [enable])
+      def initialize  enable
+        super( [enable])
         @cid = 0x21
       end
     end
 
     class SetTempOptionFlags < Request
-      def initialize seq, flag
-        super(seq, [flag])
+      def initialize  flag
+        super( [flag])
         @cid = 0x37
         @did = 0x02
       end
@@ -186,8 +190,8 @@ class Sphero
     VELOCITY_Y = 0x0000_0100
 
     class SetDataStreaming < Sphero
-      def initialize seq, n, m, mask, pcnt, mask2
-        super(seq, [n, m, mask, pcnt, mask2])
+      def initialize  n, m, mask, pcnt, mask2
+        super( [n, m, mask, pcnt, mask2])
         @cid = 0x12
         @mask = mask
         @mask2 = mask2
@@ -201,8 +205,8 @@ class Sphero
     end
 
     class ConfigureCollisionDetection < Sphero
-      def initialize seq, meth, x_t, y_t, x_spd, y_spd, dead
-        super(seq, [meth, x_t, y_t, x_spd, y_spd, dead])
+      def initialize  meth, x_t, y_t, x_spd, y_spd, dead
+        super( [meth, x_t, y_t, x_spd, y_spd, dead])
         @cid = 0x12
       end
     end
