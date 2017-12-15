@@ -150,7 +150,7 @@ You may now access the sphero from `/dev/rfcomm0`
 ## REQUIREMENTS:
 
 * A Sphero ball connected to your computer
-* Supports MRI 1.9.2/1.9.3 and Rubinius 2.0rc1 for sure...
+* Supports MRI 1.9.X, 2.X, JRuby, and Rubinius 2.0rc1 
 
 ## INSTALL:
 
@@ -162,6 +162,7 @@ You may now access the sphero from `/dev/rfcomm0`
 
 Copyright (c) 2012 Aaron Patterson
 Copyright (c) 2012-2013 The Hybrid Group
+Copyright (c) 2017 Ethan Stryker
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
