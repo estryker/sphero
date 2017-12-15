@@ -88,8 +88,6 @@ Sphero.start '/dev/tty.Sphero-YBW-RN-SPP' do
 end
 ```
 
-Here is another example:
-
 ```ruby
 Sphero.start "/dev/tty.Sphero-PRG-RN-SPP" do
 	ping
@@ -111,7 +109,7 @@ Sphero.start "/dev/tty.Sphero-PRG-RN-SPP" do
 end
 ```
 
-Here is a another way to do the same thing as the previos example, via just normal method calls instead of the DSL:
+Here is a another way to do the same thing as the previos example, via just normal method calls:
 
 ```ruby
 s = Sphero.new "/dev/tty.Sphero-PRG-RN-SPP"
@@ -121,13 +119,13 @@ s.ping
 s.roll(125, 0)
 
 # Turn 360 degrees, 30 degrees at a time
-0.step(360, 30) { |h|
+0.step(360, 30) do |h|
   h = 0 if h == 360
 
   # Set the heading to h degrees
   s.heading = h
   sleep 1
-}
+end
 sleep 1
 s.stop
 ```
