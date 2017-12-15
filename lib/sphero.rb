@@ -1,8 +1,3 @@
-=begin rdoc
-  
-
-=end
-
 require 'sphero/request'
 require 'sphero/response'
 require 'thread'

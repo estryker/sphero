@@ -1,8 +1,8 @@
 # sphero
 
-* http://github.com/hybridgroup/sphero
+* http://github.com/estryker/sphero
 
-[![Build Status](https://travis-ci.org/hybridgroup/sphero.png?branch=master)](https://travis-ci.org/hybridgroup/sphero)
+[![Build Status](https://travis-ci.org/estryker/sphero.png?branch=master)](https://travis-ci.org/estryker/sphero)
 
 ## DESCRIPTION:
 
@@ -11,15 +11,66 @@ provided by the bluetooth connection.
 
 ## FEATURES/PROBLEMS:
 
-* You need a Sphero
+* An easy to use DSL that is friendly for new coders, plus responsive collision detection. 
 
 ## SYNOPSIS:
 
 You can easily start your Sphero and send it commands like this:
 
 ```ruby
-require "Sphero"
+require "sphero"
 
+Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
+  colors = ['red','yellow','blue','green']
+
+  speed 70
+  4.times do | i |
+    color colors[i]
+    forward 4
+    turnright 90
+  end
+end
+```
+
+```ruby
+def random_color
+  Sphero::COLORS.keys.sample
+end
+
+Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
+  colors = ['blue','red','yellow','green']
+
+  on_collision do | r |
+    # puts "collision detected: #{r.x} #{r.y} #{r.z} #{r.x_magnitude} #{r.y_magnitude} #{r.speed} "
+    10.times do
+      color random_color
+      sleep 0.07
+    end
+    colors.rotate!
+    color colors.first
+    turnaround
+    forward 1
+  end
+  
+  direction 0
+  speed 100
+  color 'yellow'
+  20.times do
+    color random_color
+    sleep 0.1
+  end
+  
+  color 'yellow'
+  10.times do
+    forward 4 
+    turnright 36
+  end
+end
+
+```
+
+## If you want to use the more explicit API
+```ruby
 Sphero.start '/dev/tty.Sphero-YBW-RN-SPP' do
 	roll 60, Sphero::FORWARD
 	keep_going 3
@@ -47,13 +98,13 @@ Sphero.start "/dev/tty.Sphero-PRG-RN-SPP" do
 	roll(125, 0)
 
 	# Turn 360 degrees, 30 degrees at a time
-	0.step(360, 30) { |h|
+	0.step(360, 30) do  |h|
   	h = 0 if h == 360
 
 		# Set the heading to h degrees
  		heading = h
  		keep_going 1
-	}
+	end
 
 	keep_going 1
 	stop
