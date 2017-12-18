@@ -64,7 +64,7 @@ class Sphero
       speed speed_str.to_i
     end
 
-    on_keyboard_command "colot","change the color of sphero" do | color_str |
+    on_keyboard_command "color","change the color of sphero" do | color_str |
       color color_str
     end
 
@@ -267,22 +267,23 @@ class Sphero
         roll @curr_speed, LEFT
 	keep_going 0.2
       when "h"
-        puts command_help
+        puts @command_help
       when "/"
         # do I need to get us out of raw mode??
-        STDIN.echo = false
+        STDIN.echo = true
+        print "/"
         STDIN.cooked!
         command,arg = gets.strip.split " "
         if @keyboard_commands.has_key? command
-          @keyboad_commands[command].call(arg)
+          @keyboard_commands[command].call(arg)
         else
           puts "Unknown command"
-          puts command_help
+          puts @command_help
         end
         STDIN.echo = false
         STDIN.raw!
       when "\u0003"
-        puts "CONTROL-C"
+        puts "Quiting ..."
         break
       end
     end
@@ -496,14 +497,14 @@ class Sphero
             # delete the request so the dictionary doesn't get too big
             @request_table.delete(seq)
             if response.success?
-              puts "got something back from sphero with seq: #{response.seq} response : #{response}"
+              $stderr.puts "got something back from sphero with seq: #{response.seq} response : #{response}" if @debug
               @response_table[response.seq] = response
               num_read += 1
             else
               $stderr.puts "Response was not successful for seq #{seq}" if @debug
             end
           else
-            puts "Couldn't find a correspondig request for seq #{seq}"
+            $stderr.puts "Couldn't find a correspondig request for seq #{seq}" if @debug
           end
         end
       else
@@ -523,8 +524,8 @@ class Sphero
     rescue RubySerial::Exception => e
       retry if e.message == 'EBUSY'
     rescue Exception => e
-      puts e.message
-      puts e.backtrace.inspect
+      $stderr.puts e.message 
+      $stderr.puts e.backtrace.inspect 
       retry
     end
 
@@ -539,8 +540,8 @@ class Sphero
     rescue RubySerial::Exception => e
       retry if e.message == 'EBUSY'
     rescue Exception => e
-      puts e.message
-      puts e.backtrace.inspect
+      $stderr.puts e.message 
+      $stderr.puts e.backtrace.inspect 
       retry
     end
 
@@ -558,8 +559,8 @@ class Sphero
     rescue RubySerial::Exception => e
       retry if e.message == 'EBUSY'
     rescue Exception => e
-      puts e.message
-      puts e.backtrace.inspect
+      $stderr.puts e.message
+      $stderr.puts e.backtrace.inspect
       return nil
     end
     data

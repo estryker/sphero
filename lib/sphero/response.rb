@@ -21,7 +21,6 @@ class Sphero
     def initialize header, body
       @header = header
       @body   = body
-      puts "making a response: #{header}, #{body}"
     end
 
     def valid?
