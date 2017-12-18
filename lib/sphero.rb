@@ -2,6 +2,7 @@ require 'sphero/request'
 require 'sphero/response'
 require 'thread'
 require 'rubyserial'
+require 'io/console'
 
 class Sphero
   FORWARD = 0
@@ -55,6 +56,17 @@ class Sphero
     @response_table = Hash.new(nil)
     @curr_heading = FORWARD
     @curr_speed = 0
+    @keyboard_commands = {}
+    @command_help = "Commands:\n"
+    @debug = false
+    
+    on_keyboard_command "speed","change the speed of sphero to the number given" do | speed_str |
+      speed speed_str.to_i
+    end
+
+    on_keyboard_command "colot","change the color of sphero" do | color_str |
+      color color_str
+    end
 
     Thread.new {
       loop do
@@ -174,12 +186,15 @@ class Sphero
     Kernel::sleep duration
   end
 
-  ################################################################################
-  # added by estryker
   def direction(degrees)
     @curr_heading = degrees.to_i % 360
   end
 
+  def debug val
+    # convert val to boolean
+    @debug = !! str
+  end
+  
   def turnright(degrees)
     @curr_heading = (@curr_heading + degrees) % 360
   end
@@ -210,27 +225,81 @@ class Sphero
     keep_going seconds
   end
 
+  # TODO: don't change the curr_heading here to allow for two subsequent backward's calls 
   def backward(seconds = 3)
     @curr_heading = (@curr_heading + 180) % 360
     forward(seconds)
   end
 
+  def pick_random_color
+    color Sphero::COLORS.keys.sample
+  end
+
+  def flash times=5,duration=0.1
+    times.to_i.times do
+      pick_random_color
+      sleep duration
+    end
+  end
+
+  def on_keyboard_command(command_char, help_str, &blk)
+    @keyboard_commands[command_char] = blk
+    @command_help << "#{command_char}\t#{help_str}\n"
+  end
+  
+  def keyboard_mode
+    STDIN.echo = false
+    STDIN.raw!
+    while true
+      c = read_char
+      
+      case c
+      when "\e[A"
+        roll @curr_speed, FORWARD
+	keep_going 0.2
+      when "\e[B"
+        roll @curr_speed, BACKWARD
+        keep_going 0.2
+      when "\e[C"
+        roll @curr_speed, RIGHT
+	keep_going 0.2
+      when "\e[D"
+        roll @curr_speed, LEFT
+	keep_going 0.2
+      when "h"
+        puts command_help
+      when "/"
+        # do I need to get us out of raw mode??
+        STDIN.echo = false
+        STDIN.cooked!
+        command,arg = gets.strip.split " "
+        if @keyboard_commands.has_key? command
+          @keyboad_commands[command].call(arg)
+        else
+          puts "Unknown command"
+          puts command_help
+        end
+        STDIN.echo = false
+        STDIN.raw!
+      when "\u0003"
+        puts "CONTROL-C"
+        break
+      end
+    end
+  end
+  
   def on_collision(meth=1, x_t = 100, y_t = 100, x_spd = 100, y_spd = 100, dead = 100, &blk)
     # configure_collision_detection meth, x_t, y_t, x_spd, y_spd, dead
     #    The feature is enabled via the Configure Collision Detection (12h) API command. see Appendix A. The Method field should be set to 1, and the X and Y axis impact thresholds should be set. Typical values are in the 100-140 range.The Deadtime value should be set to a typical value of around 1 second (a value of 100).
     # configure_collision_detection 1, 100, 100, 100, 100, 100
     configure_collision_detection meth, x_t, y_t, x_spd, y_spd, dead
     semaphore = Mutex.new
-    $stderr.puts "setting up an 'on_collision' callback"
+    $stderr.puts "setting up an 'on_collision' callback" if @debug
     Thread.new do
-      $stderr.puts "About to loop inside the on_collision thread"
       # make sure other threads have a chance before responding to a collision
       sleep 0.25
       loop do
-        #$stderr.puts "pinging ..."
         begin
-          # Note - we now don't have to write in order to make sure we receive a response
-          # ping
           # TODO:  possibly hold on to the on_collision block and call it directly from the read_all loop??
           # puts "ping: #{r.inspect}\n#{r.class}"# unless r.nil?
           #$stderr.puts "messages length: #{messages.length}"
@@ -238,7 +307,7 @@ class Sphero
             r = messages.pop
             case r
             when Sphero::Response::CollisionDetected
-              $stderr.puts "Collision detected!"
+              $stderr.puts "Collision detected!" if @debug
               semaphore.synchronize {
                 blk.call(r)
               }
@@ -257,12 +326,9 @@ class Sphero
         end
       end
     end
-    $stderr.puts "Done starting the thread in 'on_collision'"
+    # $stderr.puts "Done starting the thread in 'on_collision'"
   end
   
-  ################################################################################
-  
-
   ## async messages
 
   # configure power notification messages
@@ -300,9 +366,9 @@ class Sphero
       sleep 0.002
     end
     if  @response_table.has_key? seq
-      $stderr.puts "Found packet with seq #{seq} after #{num_tries}"
+      $stderr.puts "Found packet with seq #{seq} after #{num_tries}" if @debug
     else
-      $stderr.puts "Didn't find response for #{seq}"
+      $stderr.puts "Didn't find response for #{seq}" if @debug
     end
     # delete will return the value and remove the entry
     return @response_table.delete(seq)
@@ -385,12 +451,12 @@ class Sphero
 
   def queue_packet packet
     packet.seq = get_and_increment_sequence! 
-    $stderr.puts "Queing packet #{packet.seq} (#{packet.class}) ..."
+    $stderr.puts "Queing packet #{packet.seq} (#{packet.class}) ..." if @debug
     @packets << packet
   end
 
   def write packet
-    $stderr.puts "Writing packet #{packet.seq} (#{packet.class}) ... "
+    $stderr.puts "Writing packet #{packet.seq} (#{packet.class}) ... " if @debug
     @request_table[packet.seq] = packet
     @sp.write packet.to_str
   end
@@ -415,18 +481,18 @@ class Sphero
         # pick off asynch packets and store, till we get to the message response
 
         if(Response.async?(header))
-          $stderr.puts "async response: " 
+          $stderr.puts "async response: " if @debug
           messages << Response::AsyncResponse.response(header, body)
 
           # TODO: should I put the collision detected code here? 
         else
           
           seq = header[3]
-          $stderr.puts "seq in header: #{seq}"
+          $stderr.puts "seq in header: #{seq}" if @debug
           if @request_table.has_key? seq
-            $stderr.puts "request in table: #{@request_table[seq]}"
+            $stderr.puts "request in table: #{@request_table[seq]}" if @debug
             response = @request_table[seq].response header, body
-            $stderr.puts "response received: #{response}"
+            $stderr.puts "response received: #{response}" if @debug
             # delete the request so the dictionary doesn't get too big
             @request_table.delete(seq)
             if response.success?
@@ -434,7 +500,7 @@ class Sphero
               @response_table[response.seq] = response
               num_read += 1
             else
-              $stderr.puts "Response was not successful for seq #{seq}"
+              $stderr.puts "Response was not successful for seq #{seq}" if @debug
             end
           else
             puts "Couldn't find a correspondig request for seq #{seq}"
@@ -642,4 +708,22 @@ class Sphero
     'yellow'               => {:r => 255, :g => 255, :b => 0},
     'yellowgreen'          => {:r => 154, :g => 205, :b => 50}
   }
+  
+  # used in command input
+  def read_char
+    STDIN.echo = false
+    STDIN.raw!
+    
+    input = STDIN.getc.chr
+    if input == "\e" then
+      input << STDIN.read_nonblock(3) rescue nil
+      input << STDIN.read_nonblock(2) rescue nil
+    end
+  ensure
+    STDIN.echo = true
+    STDIN.cooked!
+    
+    return input
+  end
+  
 end
