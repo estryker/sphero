@@ -255,16 +255,16 @@ class Sphero
       
       case c
       when "\e[A"
-        forward 0.1
+        forward 0.05
       when "\e[B"
         #        roll @curr_speed, BACKWARD
         #        keep_going 0.2
         turnaround
         # forward 0.1
       when "\e[C"
-        turnright 5
+        turnright 15
       when "\e[D"
-        turnleft 5
+        turnleft 15
       when "h"
         puts @command_help
       when "/"
