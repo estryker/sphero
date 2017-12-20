@@ -9,7 +9,7 @@
 A ruby gem for controlling your Sphero ball.  Sends commands over the TTY
 provided by the bluetooth connection.
 
-## FEATURES/PROBLEMS:
+## FEATURES:
 
 * An easy to use DSL that is friendly for new coders. Simple commands to move the ball forward, turning, and changing colors. 
   More advanced usage includes responsive collision detection and a new keyboard control mode! 
