@@ -11,7 +11,8 @@ provided by the bluetooth connection.
 
 ## FEATURES/PROBLEMS:
 
-* An easy to use DSL that is friendly for new coders, plus responsive collision detection. 
+* An easy to use DSL that is friendly for new coders. Simple commands to move the ball forward, turning, and changing colors. 
+  More advanced usage includes responsive collision detection and a new keyboard control mode! 
 
 ## SYNOPSIS:
 
@@ -31,7 +32,7 @@ Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
   end
 end
 ```
-
+## Here is an example with a collision detection block
 ```ruby
 def random_color
   Sphero::COLORS.keys.sample
@@ -68,7 +69,39 @@ Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
 end
 
 ```
+## Use Keyboard control to make Sphero run in interactive mode!
+*Use the 'h' key to see all the registered commands for keyboard mode. Changing speed and color are currently built in.* 
+```ruby
+require 'sphero'
 
+Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
+
+  on_collision do | x |
+    5.times do
+      pick_random_color
+      sleep 0.1
+    end
+  end
+
+  # add a command that can be run by hitting the '/' followed by 'square X' where X determines the size of the square
+  on_keyboard_command "square","draw a square of specified size"  do | size_str |
+    size = size_str.to_i
+    4.times do | i |
+      forward size
+      turnright 90
+    end
+  end
+
+  on_keyboard_command "flash","flash colors the given number of times quickly" do | times_str |
+    flash times_str.to_i, 0.08
+  end
+  
+  speed 50
+
+  puts "Ready!"
+  keyboard_mode
+end
+```
 ## If you want to use the more explicit API
 ```ruby
 Sphero.start '/dev/tty.Sphero-YBW-RN-SPP' do
