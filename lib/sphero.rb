@@ -155,6 +155,7 @@ class Sphero
 
   def stop
     roll 0, 0
+    @curr_speed = 0
   end
 
   def heading= h
@@ -248,21 +249,25 @@ class Sphero
   def keyboard_mode
     STDIN.echo = false
     STDIN.raw!
+    prev_key = ""
     while true
       c = read_char
-      
+      curr_key = c
       case c
       when "\e[A"
         forward 0.05
       when "\e[B"
         #        roll @curr_speed, BACKWARD
         #        keep_going 0.2
-        turnaround
+        stop
+        turnaround if prev_key == "\e[B" # to allow to stop and turnaround 
         # forward 0.1
       when "\e[C"
         turnright 15
+        forward 0.05 unless @curr_speed == 0
       when "\e[D"
         turnleft 15
+        forward 0.05 unless @curr_speed == 0
       when "a"
         #TODO: test to see what the max speed is. for now, keep it in one byte
         if @curr_speed < 246
@@ -296,6 +301,7 @@ class Sphero
         puts "Quiting ..."
         break
       end
+      prev_key = curr_key
     end
   end
   
