@@ -1,3 +1,7 @@
+=begin rdoc
+ Sphero - a class that controls a Sphero ball. 
+
+=end
 require 'sphero/request'
 require 'sphero/response'
 require 'thread'
