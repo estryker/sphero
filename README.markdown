@@ -11,8 +11,8 @@ provided by the bluetooth connection.
 
 ## FEATURES:
 
-* An easy to use DSL that is friendly for new coders. Simple commands to move the ball forward, turning, and changing colors. 
-  More advanced usage includes responsive collision detection and a new keyboard control mode! 
+* An easy to use DSL that is friendly for new coders. Simple commands for moving the ball forward, turning, and changing colors. 
+  More advanced usage includes collision detection and a new keyboard control mode! 
 
 ## SYNOPSIS:
 
@@ -39,8 +39,8 @@ def random_color
 end
 
 Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
-  colors = ['blue','red','yellow','green']
 
+  # This block will run when Sphero detects that it collided with something
   on_collision do | r |
     # puts "collision detected: #{r.x} #{r.y} #{r.z} #{r.x_magnitude} #{r.y_magnitude} #{r.speed} "
     10.times do
@@ -55,11 +55,6 @@ Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
   
   direction 0
   speed 100
-  color 'yellow'
-  20.times do
-    color random_color
-    sleep 0.1
-  end
   
   color 'yellow'
   10.times do

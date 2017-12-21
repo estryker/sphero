@@ -210,7 +210,7 @@ class Sphero
   def speed(new_speed)
     n = new_speed.to_i
     # what is the max speed of a Sphero? 
-    @curr_speed = (n >= 0 && n <= 200) ? n : 10
+    @curr_speed = (n >= 0 && n <= 255) ? n : 10
   end
   
   def forward(seconds = 3,speed=nil)
@@ -259,6 +259,19 @@ class Sphero
         turnright 15
       when "\e[D"
         turnleft 15
+      when "a"
+        #TODO: test to see what the max speed is. for now, keep it in one byte
+        if @curr_speed < 246
+          @curr_speed += 10
+        else
+          @curr_speed = 255
+        end
+      when "z"
+        if @curr_speed <= 10
+          @curr_speed = 0
+        else
+          @curr_speed -= 10
+        end
       when "h"
         puts @command_help
       when "/"
