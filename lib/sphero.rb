@@ -225,12 +225,6 @@ class Sphero
     keep_going seconds
   end
 
-  # TODO: don't change the curr_heading here to allow for two subsequent backward's calls 
-  def backward(seconds = 3)
-    @curr_heading = (@curr_heading + 180) % 360
-    forward(seconds)
-  end
-
   def pick_random_color
     color Sphero::COLORS.keys.sample
   end
