@@ -81,7 +81,7 @@ Sphero.start '/dev/tty.Sphero-BRG-AMP-SPP' do
   # add a command that can be run by hitting the '/' followed by 'square X' where X determines the size of the square
   on_keyboard_command "square","draw a square of specified size"  do | size_str |
     size = size_str.to_i
-    4.times do | i |
+    4.times do 
       forward size
       turnright 90
     end
